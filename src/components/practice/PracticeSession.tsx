@@ -5,7 +5,7 @@ import { useConfigStore } from '../../stores/configStore'
 import { useProgressStore } from '../../stores/progressStore'
 import { usePointQueueStore } from '../../stores/pointQueueStore'
 import { useStudentConfig } from '../../hooks/useStudentConfig'
-import { getGradeWords } from '../../data/words'
+import { getGradeWords, allGrades } from '../../data/words'
 import { getWordsForRound } from '../../utils/wordSets'
 import { checkAnswer, calculatePracticePoints } from '../../utils/scoring'
 import { speak } from '../../services/tts'
@@ -31,6 +31,7 @@ export function PracticeSession() {
 
   const [step, setStep] = useState<PracticeStep>('select')
   const [mode, setMode] = useState<PracticeMode>('meaning-typing')
+  const [selectedSource, setSelectedSource] = useState(effectiveGrade)
   const [words, setWords] = useState<Word[]>([])
   const [currentIndex, setCurrentIndex] = useState(0)
   const [userAnswer, setUserAnswer] = useState('')
@@ -44,20 +45,33 @@ export function PracticeSession() {
     if (!student) navigate('/')
   }, [student, navigate])
 
+  useEffect(() => {
+    setSelectedSource(effectiveGrade)
+  }, [effectiveGrade])
+
+  const isCustomSource = selectedSource.startsWith('custom_')
+  const sourceData = getGradeWords(selectedSource, customSets)
+
   const startPractice = useCallback((selectedMode: PracticeMode) => {
     if (!progress) return
     setMode(selectedMode)
 
-    const gradeWords = getGradeWords(effectiveGrade, customSets)
-    if (!gradeWords) return
+    const gradeWords = getGradeWords(selectedSource, customSets)
+    if (!gradeWords || gradeWords.words.length === 0) return
 
-    const roundWords = getWordsForRound(gradeWords.words, progress.currentRound)
-    const shuffled = [...roundWords].sort(() => Math.random() - 0.5).slice(0, 10)
+    let pool: Word[]
+    if (selectedSource.startsWith('custom_')) {
+      pool = gradeWords.words
+    } else {
+      pool = getWordsForRound(gradeWords.words, progress.currentRound)
+    }
+
+    const shuffled = [...pool].sort(() => Math.random() - 0.5).slice(0, 10)
     setWords(shuffled)
     setCurrentIndex(0)
     setCorrectCount(0)
     setStep('session')
-  }, [progress, effectiveGrade, customSets])
+  }, [progress, selectedSource, customSets])
 
   const currentWord = words[currentIndex]
 
@@ -150,41 +164,83 @@ export function PracticeSession() {
 
   if (step === 'select') {
     const isOcrAvailable = !!config.geminiApiKey
+    const sourceWordCount = sourceData?.words.length ?? 0
+    const practiceWordCount = isCustomSource
+      ? sourceWordCount
+      : Math.min(progress.currentRound * 10, sourceWordCount)
+
     return (
       <div className="flex flex-col gap-6">
         <h2 className="text-2xl font-bold text-gray-800 text-center">연습 모드 선택</h2>
-        <p className="text-gray-500 text-center">현재 {progress.currentRound}회차 범위의 단어를 연습합니다.</p>
+
+        <div className="bg-white rounded-2xl shadow-sm p-4">
+          <label className="block text-sm font-medium text-gray-600 mb-2">연습할 세트 선택</label>
+          <select
+            value={selectedSource}
+            onChange={(e) => setSelectedSource(e.target.value)}
+            className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-indigo-400 focus:outline-none text-sm"
+          >
+            <optgroup label="기본 학년">
+              {allGrades.map((g) => (
+                <option key={g.grade} value={g.grade}>
+                  {g.gradeLabel} ({g.words.length}단어)
+                  {g.grade === effectiveGrade ? ' ← 현재 할당' : ''}
+                </option>
+              ))}
+            </optgroup>
+            {customSets.length > 0 && (
+              <optgroup label="커스텀 세트">
+                {customSets.map((cs) => (
+                  <option key={cs.id} value={cs.id}>
+                    {cs.name} ({cs.words.length}개)
+                    {cs.id === effectiveGrade ? ' ← 현재 할당' : ''}
+                  </option>
+                ))}
+              </optgroup>
+            )}
+          </select>
+          <p className="text-xs text-gray-400 mt-2">
+            {isCustomSource
+              ? `커스텀 세트 전체 ${sourceWordCount}개에서 최대 10개 출제`
+              : `${progress.currentRound}회차 범위 (${practiceWordCount}개)에서 최대 10개 출제`}
+          </p>
+          {sourceWordCount === 0 && (
+            <p className="text-xs text-red-500 mt-1">이 세트에 단어/문장이 없습니다. 관리자 패널에서 추가해 주세요.</p>
+          )}
+        </div>
 
         <div className="grid grid-cols-1 gap-3">
           <button
             onClick={() => startPractice('meaning-typing')}
-            className="p-5 bg-white rounded-2xl shadow-sm border-2 border-transparent hover:border-emerald-300 hover:shadow-md transition-all text-left active:scale-[0.98]"
+            disabled={sourceWordCount === 0}
+            className="p-5 bg-white rounded-2xl shadow-sm border-2 border-transparent hover:border-emerald-300 hover:shadow-md transition-all text-left active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <div className="flex items-center gap-3">
               <span className="text-3xl">📖</span>
               <div>
                 <h3 className="font-bold text-gray-800">뜻 보고 타이핑</h3>
-                <p className="text-sm text-gray-500">한글 뜻을 보고 영어 단어를 입력</p>
+                <p className="text-sm text-gray-500">한글 뜻을 보고 영어를 입력</p>
               </div>
             </div>
           </button>
 
           <button
             onClick={() => startPractice('listen-typing')}
-            className="p-5 bg-white rounded-2xl shadow-sm border-2 border-transparent hover:border-blue-300 hover:shadow-md transition-all text-left active:scale-[0.98]"
+            disabled={sourceWordCount === 0}
+            className="p-5 bg-white rounded-2xl shadow-sm border-2 border-transparent hover:border-blue-300 hover:shadow-md transition-all text-left active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <div className="flex items-center gap-3">
               <span className="text-3xl">🎧</span>
               <div>
                 <h3 className="font-bold text-gray-800">듣고 타이핑</h3>
-                <p className="text-sm text-gray-500">발음을 듣고 영어 단어를 입력</p>
+                <p className="text-sm text-gray-500">발음을 듣고 영어를 입력</p>
               </div>
             </div>
           </button>
 
           <button
             onClick={() => startPractice('meaning-writing')}
-            disabled={!isOcrAvailable}
+            disabled={!isOcrAvailable || sourceWordCount === 0}
             className="p-5 bg-white rounded-2xl shadow-sm border-2 border-transparent hover:border-purple-300 hover:shadow-md transition-all text-left disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98]"
           >
             <div className="flex items-center gap-3">
@@ -201,7 +257,7 @@ export function PracticeSession() {
 
           <button
             onClick={() => startPractice('listen-writing')}
-            disabled={!isOcrAvailable}
+            disabled={!isOcrAvailable || sourceWordCount === 0}
             className="p-5 bg-white rounded-2xl shadow-sm border-2 border-transparent hover:border-orange-300 hover:shadow-md transition-all text-left disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98]"
           >
             <div className="flex items-center gap-3">
