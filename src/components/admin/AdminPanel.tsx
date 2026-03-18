@@ -106,32 +106,7 @@ export function AdminPanel() {
     showMessage(`전송 완료: 성공 ${success}건, 실패 ${failed}건`)
   }
 
-  const handleExportData = (type: 'config' | 'words' | 'progress' | 'all' | 'customSets') => {
-    let data: unknown
-    let filename: string
-
-    if (type === 'config') {
-      const { growndApiKey, geminiApiKey, ...safeConfig } = config
-      void growndApiKey
-      void geminiApiKey
-      data = safeConfig
-      filename = 'grownd-quiz-config.json'
-    } else if (type === 'progress') {
-      data = progressMap
-      filename = 'grownd-quiz-progress.json'
-    } else if (type === 'customSets') {
-      data = customWords.sets
-      filename = 'grownd-quiz-custom-sets.json'
-    } else if (type === 'all') {
-      const { growndApiKey, geminiApiKey, ...safeConfig } = config
-      void growndApiKey
-      void geminiApiKey
-      data = { config: safeConfig, progress: progressMap, students, customSets: customWords.sets }
-      filename = 'grownd-quiz-all-data.json'
-    } else {
-      return
-    }
-
+  const downloadJson = (data: unknown, filename: string) => {
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -142,7 +117,26 @@ export function AdminPanel() {
     showMessage(`${filename} 다운로드 완료`)
   }
 
-  const handleImportData = (type: 'progress' | 'all' | 'customSets') => {
+  const handleExportData = (type: 'config' | 'configFull' | 'progress' | 'all' | 'customSets') => {
+    if (type === 'config') {
+      const { growndApiKey, geminiApiKey, ...safeConfig } = config
+      void growndApiKey; void geminiApiKey
+      downloadJson(safeConfig, 'grownd-quiz-config.json')
+    } else if (type === 'configFull') {
+      downloadJson(config, 'grownd-quiz-config-full.json')
+    } else if (type === 'progress') {
+      downloadJson(progressMap, 'grownd-quiz-progress.json')
+    } else if (type === 'customSets') {
+      downloadJson(customWords.sets, 'grownd-quiz-custom-sets.json')
+    } else if (type === 'all') {
+      downloadJson(
+        { config, progress: progressMap, students, customSets: customWords.sets },
+        'grownd-quiz-all-data.json'
+      )
+    }
+  }
+
+  const uploadJson = (callback: (data: Record<string, unknown>) => void) => {
     const input = document.createElement('input')
     input.type = 'file'
     input.accept = '.json'
@@ -152,28 +146,37 @@ export function AdminPanel() {
       try {
         const text = await file.text()
         const data = JSON.parse(text)
-        if (type === 'progress') {
-          importProgress(data)
-          showMessage('진도 데이터를 가져왔습니다.')
-        } else if (type === 'customSets') {
-          if (Array.isArray(data)) {
-            customWords.importSets(data)
-            showMessage(`커스텀 세트 ${data.length}개를 가져왔습니다.`)
-          } else {
-            showMessage('잘못된 커스텀 세트 파일입니다.')
-          }
-        } else if (type === 'all') {
-          if (data.config) setConfig(data.config)
-          if (data.progress) importProgress(data.progress)
-          if (data.students) setStudents(data.students)
-          if (data.customSets) customWords.importSets(data.customSets)
-          showMessage('전체 데이터를 가져왔습니다.')
-        }
+        callback(data)
       } catch {
         showMessage('파일을 읽는데 실패했습니다.')
       }
     }
     input.click()
+  }
+
+  const handleImportData = (type: 'config' | 'progress' | 'all' | 'customSets') => {
+    uploadJson((data) => {
+      if (type === 'config') {
+        setConfig(data as Partial<AppConfig>)
+        showMessage('설정을 가져왔습니다. (API키, 학년, 포인트 설정 등)')
+      } else if (type === 'progress') {
+        importProgress(data as unknown as Record<number, StudentProgress>)
+        showMessage('진도 데이터를 가져왔습니다.')
+      } else if (type === 'customSets') {
+        if (Array.isArray(data)) {
+          customWords.importSets(data)
+          showMessage(`커스텀 세트 ${data.length}개를 가져왔습니다.`)
+        } else {
+          showMessage('잘못된 커스텀 세트 파일입니다.')
+        }
+      } else if (type === 'all') {
+        if (data.config) setConfig(data.config as Partial<AppConfig>)
+        if (data.progress) importProgress(data.progress as unknown as Record<number, StudentProgress>)
+        if (data.students) setStudents(data.students as Parameters<typeof setStudents>[0])
+        if (data.customSets) customWords.importSets(data.customSets as Parameters<typeof customWords.importSets>[0])
+        showMessage('전체 데이터를 가져왔습니다.')
+      }
+    })
   }
 
   const tabs: { id: Tab; label: string; icon: string }[] = [
@@ -807,15 +810,59 @@ function DataManagement({
   onImport,
   onClearProgress,
 }: {
-  onExport: (type: 'config' | 'words' | 'progress' | 'all' | 'customSets') => void
-  onImport: (type: 'progress' | 'all' | 'customSets') => void
+  onExport: (type: 'config' | 'configFull' | 'progress' | 'all' | 'customSets') => void
+  onImport: (type: 'config' | 'progress' | 'all' | 'customSets') => void
   onClearProgress: () => void
 }) {
   const [confirmClear, setConfirmClear] = useState(false)
+  const [showGuide, setShowGuide] = useState(false)
 
   return (
     <div className="flex flex-col gap-5">
-      <h3 className="font-bold text-gray-800 text-lg">데이터 관리</h3>
+      <div className="flex justify-between items-center">
+        <h3 className="font-bold text-gray-800 text-lg">데이터 관리</h3>
+        <button
+          onClick={() => setShowGuide(!showGuide)}
+          className="text-xs px-3 py-1.5 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition-colors"
+        >
+          {showGuide ? '가이드 닫기' : '가이드 보기'}
+        </button>
+      </div>
+
+      {showGuide && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-gray-700 flex flex-col gap-3">
+          <h4 className="font-bold text-amber-800">데이터 관리 가이드</h4>
+
+          <div>
+            <p className="font-semibold text-gray-800 mb-1">내보내기 (Export) - JSON 파일로 다운로드</p>
+            <ul className="flex flex-col gap-1.5 ml-3">
+              <li><span className="font-semibold text-blue-700">설정 (API키 제외)</span> — 학년, 포인트 설정, 학생번호 범위 등. API키는 빠짐 (공유용)</li>
+              <li><span className="font-semibold text-blue-700">설정 (API키 포함)</span> — 위 내용 + GROWND/Gemini API키 포함 (다른 기기 이전용)</li>
+              <li><span className="font-semibold text-green-700">진도</span> — 학생별 퀴즈 기록, 연습 기록, 현재 회차, 오답 단어, 맞춤 설정</li>
+              <li><span className="font-semibold text-purple-700">커스텀 세트</span> — 관리자가 만든 커스텀 단어/문장 세트</li>
+              <li><span className="font-semibold text-indigo-700">전체 (API키 포함)</span> — 위 모든 데이터를 하나의 파일로 (백업/이전용)</li>
+            </ul>
+          </div>
+
+          <div>
+            <p className="font-semibold text-gray-800 mb-1">가져오기 (Import) - JSON 파일 업로드</p>
+            <ul className="flex flex-col gap-1.5 ml-3">
+              <li><span className="font-semibold text-blue-700">설정 가져오기</span> — 기존 설정을 덮어쓰기 (API키, 학년, 포인트 모두 적용)</li>
+              <li><span className="font-semibold text-green-700">진도 가져오기</span> — 학생 진도를 덮어쓰기 (같은 학생번호면 대체됨)</li>
+              <li><span className="font-semibold text-purple-700">커스텀 세트 가져오기</span> — 같은 ID면 대체, 새 ID면 추가</li>
+              <li><span className="font-semibold text-indigo-700">전체 가져오기</span> — "전체 내보내기" 파일을 통째로 복원</li>
+            </ul>
+          </div>
+
+          <div className="bg-amber-100 rounded-lg p-2 text-xs text-amber-800">
+            <p className="font-bold mb-1">사용 시나리오</p>
+            <p>• <b>다른 기기에서 동일 설정 사용</b>: "설정 (API키 포함)" 내보내기 → 다른 기기에서 "설정 가져오기"</p>
+            <p>• <b>전체 백업/복원</b>: "전체 내보내기" → 다른 기기에서 "전체 가져오기"</p>
+            <p>• <b>커스텀 세트 공유</b>: "커스텀 세트 내보내기" → 다른 곳에서 "커스텀 세트 가져오기"</p>
+            <p>• <b>설정만 공유 (API키 비공개)</b>: "설정 (API키 제외)" 내보내기</p>
+          </div>
+        </div>
+      )}
 
       <div>
         <h4 className="font-semibold text-gray-700 mb-2">내보내기 (Export)</h4>
@@ -824,7 +871,13 @@ function DataManagement({
             onClick={() => onExport('config')}
             className="py-3 bg-blue-50 text-blue-700 rounded-xl text-sm font-semibold hover:bg-blue-100 transition-colors"
           >
-            📋 설정 내보내기
+            📋 설정 (API키 제외)
+          </button>
+          <button
+            onClick={() => onExport('configFull')}
+            className="py-3 bg-blue-50 text-blue-700 rounded-xl text-sm font-semibold hover:bg-blue-100 transition-colors border border-blue-200"
+          >
+            🔑 설정 (API키 포함)
           </button>
           <button
             onClick={() => onExport('progress')}
@@ -840,9 +893,9 @@ function DataManagement({
           </button>
           <button
             onClick={() => onExport('all')}
-            className="py-3 col-span-2 bg-indigo-50 text-indigo-700 rounded-xl text-sm font-semibold hover:bg-indigo-100 transition-colors"
+            className="py-3 col-span-2 bg-indigo-50 text-indigo-700 rounded-xl text-sm font-semibold hover:bg-indigo-100 transition-colors border border-indigo-200"
           >
-            💾 전체 데이터 내보내기
+            💾 전체 데이터 내보내기 (API키 포함)
           </button>
         </div>
       </div>
@@ -850,6 +903,12 @@ function DataManagement({
       <div>
         <h4 className="font-semibold text-gray-700 mb-2">가져오기 (Import)</h4>
         <div className="grid grid-cols-2 gap-2">
+          <button
+            onClick={() => onImport('config')}
+            className="py-3 bg-blue-50 text-blue-700 rounded-xl text-sm font-semibold hover:bg-blue-100 transition-colors"
+          >
+            📋 설정 가져오기
+          </button>
           <button
             onClick={() => onImport('progress')}
             className="py-3 bg-green-50 text-green-700 rounded-xl text-sm font-semibold hover:bg-green-100 transition-colors"
