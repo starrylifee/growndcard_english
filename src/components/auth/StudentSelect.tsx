@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import { useStudentStore } from '../../stores/studentStore'
 import { useProgressStore } from '../../stores/progressStore'
+import { getAnimalEmoji } from '../../utils/emoji'
 
 export function StudentSelect() {
   const navigate = useNavigate()
@@ -42,13 +43,7 @@ export function StudentSelect() {
               onClick={() => handleSelect(student.studentCode, student.studentName)}
               className="flex flex-col items-center gap-1 p-4 bg-white rounded-2xl shadow-sm border-2 border-transparent hover:border-indigo-400 hover:shadow-md transition-all active:scale-95"
             >
-              <span className="text-3xl">
-                {student.avatar ? (
-                  <img src={student.avatar} alt="" className="w-10 h-10 rounded-full" />
-                ) : (
-                  '👤'
-                )}
-              </span>
+              <span className="text-3xl">{getAnimalEmoji(student.studentCode)}</span>
               <span className="font-bold text-indigo-600 text-lg">{student.studentCode}</span>
               <span className="text-sm text-gray-600 truncate w-full text-center">
                 {student.studentName}

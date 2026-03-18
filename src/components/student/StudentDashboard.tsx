@@ -4,6 +4,7 @@ import { useProgressStore } from '../../stores/progressStore'
 import { useStudentConfig } from '../../hooks/useStudentConfig'
 import { getGradeWords, getGradeLabel } from '../../data/words'
 import { getSetCount } from '../../utils/wordSets'
+import { getAnimalEmoji } from '../../utils/emoji'
 import { useEffect } from 'react'
 
 export function StudentDashboard() {
@@ -34,7 +35,7 @@ export function StudentDashboard() {
     <div className="flex flex-col gap-6">
       <div className="bg-white rounded-2xl shadow-sm p-6">
         <div className="flex items-center gap-4 mb-4">
-          <div className="text-4xl">👤</div>
+          <div className="text-4xl">{getAnimalEmoji(student.studentCode)}</div>
           <div>
             <h2 className="text-xl font-bold text-gray-800">{student.studentName}</h2>
             <p className="text-gray-500 text-sm">
