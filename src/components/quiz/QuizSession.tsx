@@ -189,9 +189,12 @@ export function QuizSession() {
     setStep('result')
   }
 
+  const ttsConfig = config.ttsConfig ?? { wordRate: 0.8, sentenceRate: 0.85 }
   const playWord = useCallback(() => {
-    if (currentWord) speak(currentWord.english)
-  }, [currentWord])
+    if (!currentWord) return
+    const hasSpace = currentWord.english.includes(' ')
+    speak(currentWord.english, hasSpace ? ttsConfig.sentenceRate : ttsConfig.wordRate)
+  }, [currentWord, ttsConfig])
 
   if (!student || !progress) return null
 

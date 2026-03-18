@@ -62,6 +62,11 @@ export interface PointConfig {
   quizFormat: QuizFormat;
 }
 
+export interface TtsConfig {
+  wordRate: number;
+  sentenceRate: number;
+}
+
 export interface AppConfig {
   growndApiKey: string;
   growndClassId: string;
@@ -69,6 +74,7 @@ export interface AppConfig {
   studentCodeRange: { start: number; end: number };
   selectedGrade: string;
   pointConfig: PointConfig;
+  ttsConfig: TtsConfig;
 }
 
 export interface StudentInfo {

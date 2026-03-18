@@ -6,15 +6,24 @@ interface HandwritingCanvasProps {
 }
 
 type ToolMode = 'pen' | 'eraser'
+type BgMode = 'plain' | 'notebook'
+
+const CANVAS_HEIGHT_PLAIN = 280
+const CANVAS_HEIGHT_NOTEBOOK = 320
+const NOTEBOOK_LINE_GAP = 48
+const NOTEBOOK_MIDDLE_GAP = 24
 
 export function HandwritingCanvas({ onSubmit, disabled }: HandwritingCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [isDrawing, setIsDrawing] = useState(false)
   const [hasStrokes, setHasStrokes] = useState(false)
   const [tool, setTool] = useState<ToolMode>('pen')
+  const [bgMode, setBgMode] = useState<BgMode>('plain')
 
   const PEN_WIDTH = 3
   const ERASER_WIDTH = 24
+
+  const canvasHeight = bgMode === 'notebook' ? CANVAS_HEIGHT_NOTEBOOK : CANVAS_HEIGHT_PLAIN
 
   const getCtx = useCallback(() => {
     const canvas = canvasRef.current
@@ -22,17 +31,65 @@ export function HandwritingCanvas({ onSubmit, disabled }: HandwritingCanvasProps
     return canvas.getContext('2d')
   }, [])
 
-  const drawGuideLines = useCallback((ctx: CanvasRenderingContext2D, w: number, h: number) => {
+  const drawPlainGuideLines = useCallback((ctx: CanvasRenderingContext2D, w: number, h: number) => {
     ctx.save()
     ctx.strokeStyle = '#E5E7EB'
     ctx.lineWidth = 1
     ctx.setLineDash([4, 4])
-
     const lineSpacing = 40
     for (let y = lineSpacing; y < h; y += lineSpacing) {
       ctx.beginPath()
       ctx.moveTo(0, y)
       ctx.lineTo(w, y)
+      ctx.stroke()
+    }
+    ctx.setLineDash([])
+    ctx.restore()
+  }, [])
+
+  const drawNotebookLines = useCallback((ctx: CanvasRenderingContext2D, w: number, _h: number) => {
+    ctx.save()
+
+    const margin = 16
+    const startY = 20
+
+    for (let row = 0; row < 2; row++) {
+      const baseY = startY + row * (NOTEBOOK_LINE_GAP * 3 + 20)
+
+      // Top line (red, thin)
+      ctx.strokeStyle = '#F87171'
+      ctx.lineWidth = 1
+      ctx.setLineDash([])
+      ctx.beginPath()
+      ctx.moveTo(margin, baseY)
+      ctx.lineTo(w - margin, baseY)
+      ctx.stroke()
+
+      // Middle dashed line
+      ctx.strokeStyle = '#93C5FD'
+      ctx.lineWidth = 0.8
+      ctx.setLineDash([3, 3])
+      ctx.beginPath()
+      ctx.moveTo(margin, baseY + NOTEBOOK_MIDDLE_GAP)
+      ctx.lineTo(w - margin, baseY + NOTEBOOK_MIDDLE_GAP)
+      ctx.stroke()
+
+      // Bottom line (red, thin)
+      ctx.strokeStyle = '#F87171'
+      ctx.lineWidth = 1
+      ctx.setLineDash([])
+      ctx.beginPath()
+      ctx.moveTo(margin, baseY + NOTEBOOK_LINE_GAP)
+      ctx.lineTo(w - margin, baseY + NOTEBOOK_LINE_GAP)
+      ctx.stroke()
+
+      // Descender dashed line (for g, p, y, etc.)
+      ctx.strokeStyle = '#D1D5DB'
+      ctx.lineWidth = 0.5
+      ctx.setLineDash([2, 4])
+      ctx.beginPath()
+      ctx.moveTo(margin, baseY + NOTEBOOK_LINE_GAP + NOTEBOOK_MIDDLE_GAP)
+      ctx.lineTo(w - margin, baseY + NOTEBOOK_LINE_GAP + NOTEBOOK_MIDDLE_GAP)
       ctx.stroke()
     }
 
@@ -55,14 +112,20 @@ export function HandwritingCanvas({ onSubmit, disabled }: HandwritingCanvasProps
     ctx.fillStyle = '#FFFFFF'
     ctx.fillRect(0, 0, rect.width, rect.height)
 
-    drawGuideLines(ctx, rect.width, rect.height)
+    if (bgMode === 'notebook') {
+      drawNotebookLines(ctx, rect.width, rect.height)
+    } else {
+      drawPlainGuideLines(ctx, rect.width, rect.height)
+    }
 
     ctx.lineCap = 'round'
     ctx.lineJoin = 'round'
-  }, [drawGuideLines])
+  }, [bgMode, drawPlainGuideLines, drawNotebookLines])
 
   useEffect(() => {
     initCanvas()
+    setHasStrokes(false)
+    setTool('pen')
   }, [initCanvas])
 
   const getPos = (e: React.TouchEvent | React.MouseEvent) => {
@@ -134,9 +197,6 @@ export function HandwritingCanvas({ onSubmit, disabled }: HandwritingCanvasProps
     const canvas = canvasRef.current
     if (!canvas || !hasStrokes) return
 
-    const ctx = canvas.getContext('2d')
-    if (!ctx) return
-
     const dpr = window.devicePixelRatio || 1
     const rect = canvas.getBoundingClientRect()
 
@@ -156,7 +216,7 @@ export function HandwritingCanvas({ onSubmit, disabled }: HandwritingCanvasProps
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex gap-2 items-center">
+      <div className="flex gap-2 items-center flex-wrap">
         <button
           onClick={() => setTool('pen')}
           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors ${
@@ -177,6 +237,30 @@ export function HandwritingCanvas({ onSubmit, disabled }: HandwritingCanvasProps
         >
           <span className="text-base">🧹</span> 지우개
         </button>
+
+        <div className="h-5 w-px bg-gray-300 mx-1" />
+
+        <button
+          onClick={() => setBgMode('plain')}
+          className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+            bgMode === 'plain'
+              ? 'bg-indigo-600 text-white'
+              : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+          }`}
+        >
+          기본
+        </button>
+        <button
+          onClick={() => setBgMode('notebook')}
+          className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+            bgMode === 'notebook'
+              ? 'bg-indigo-600 text-white'
+              : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+          }`}
+        >
+          영어노트
+        </button>
+
         <button
           onClick={clearCanvas}
           className="px-3 py-1.5 bg-gray-100 text-gray-600 rounded-lg text-sm font-semibold hover:bg-gray-200 transition-colors ml-auto"
@@ -189,7 +273,7 @@ export function HandwritingCanvas({ onSubmit, disabled }: HandwritingCanvasProps
         <canvas
           ref={canvasRef}
           className={`w-full touch-none ${tool === 'eraser' ? 'cursor-cell' : 'cursor-crosshair'}`}
-          style={{ height: '280px' }}
+          style={{ height: `${canvasHeight}px` }}
           onMouseDown={startDraw}
           onMouseMove={draw}
           onMouseUp={endDraw}
@@ -200,7 +284,11 @@ export function HandwritingCanvas({ onSubmit, disabled }: HandwritingCanvasProps
         />
         {!hasStrokes && (
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <p className="text-gray-300 text-sm">여기에 영어를 쓰세요 (단어 또는 문장)</p>
+            <p className="text-gray-300 text-sm">
+              {bgMode === 'notebook'
+                ? '빨간 줄 사이에 영어를 쓰세요 (2줄)'
+                : '여기에 영어를 쓰세요 (단어 또는 문장)'}
+            </p>
           </div>
         )}
       </div>

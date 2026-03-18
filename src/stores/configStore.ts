@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { AppConfig, PointConfig, QuizFormat } from '../types'
+import type { AppConfig, PointConfig, QuizFormat, TtsConfig } from '../types'
 
 const defaultPointConfig: PointConfig = {
   practice: { completionPoints: 1 },
@@ -28,6 +28,11 @@ interface ConfigState {
   resetConfig: () => void
 }
 
+const defaultTtsConfig: TtsConfig = {
+  wordRate: 0.8,
+  sentenceRate: 0.85,
+}
+
 const defaultConfig: AppConfig = {
   growndApiKey: '',
   growndClassId: '',
@@ -35,6 +40,7 @@ const defaultConfig: AppConfig = {
   studentCodeRange: { start: 1, end: 30 },
   selectedGrade: 'elementary3',
   pointConfig: defaultPointConfig,
+  ttsConfig: defaultTtsConfig,
 }
 
 export const useConfigStore = create<ConfigState>()(

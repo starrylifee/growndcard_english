@@ -218,7 +218,7 @@ export function AdminPanel() {
       <div className="bg-white rounded-2xl shadow-sm p-6">
         {tab === 'api' && <ApiSettings config={config} setConfig={setConfig} />}
         {tab === 'points' && (
-          <PointSettings config={config} setPointConfig={setPointConfig} />
+          <PointSettings config={config} setConfig={setConfig} setPointConfig={setPointConfig} />
         )}
         {tab === 'students' && (
           <StudentManagement
@@ -382,11 +382,17 @@ function ApiSettings({
 
 function PointSettings({
   config,
+  setConfig,
   setPointConfig,
 }: {
   config: AppConfig
+  setConfig: (c: Partial<AppConfig>) => void
   setPointConfig: (c: Partial<PointConfig>) => void
 }) {
+  const tts = config.ttsConfig ?? { wordRate: 0.8, sentenceRate: 0.85 }
+  const updateTts = (field: string, value: number) => {
+    setConfig({ ttsConfig: { ...tts, [field]: value } })
+  }
   const pc = config.pointConfig
 
   const updateQuiz = (field: string, value: number) => {
@@ -541,6 +547,47 @@ function PointSettings({
             </div>
           ))}
         </div>
+      </div>
+
+      <div className="border-t pt-4">
+        <h4 className="font-semibold text-gray-700 mb-3">발음 속도 (TTS)</h4>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm text-gray-500 mb-1">
+              단어 속도: <span className="font-semibold text-gray-700">{tts.wordRate}</span>
+            </label>
+            <input
+              type="range"
+              min={0.5}
+              max={1.2}
+              step={0.05}
+              value={tts.wordRate}
+              onChange={(e) => updateTts('wordRate', Number(e.target.value))}
+              className="w-full accent-indigo-600"
+            />
+            <div className="flex justify-between text-xs text-gray-400">
+              <span>느림</span><span>보통</span><span>빠름</span>
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm text-gray-500 mb-1">
+              문장 속도: <span className="font-semibold text-gray-700">{tts.sentenceRate}</span>
+            </label>
+            <input
+              type="range"
+              min={0.5}
+              max={1.2}
+              step={0.05}
+              value={tts.sentenceRate}
+              onChange={(e) => updateTts('sentenceRate', Number(e.target.value))}
+              className="w-full accent-indigo-600"
+            />
+            <div className="flex justify-between text-xs text-gray-400">
+              <span>느림</span><span>보통</span><span>빠름</span>
+            </div>
+          </div>
+        </div>
+        <p className="text-xs text-gray-400 mt-2">단어 = 공백 없는 텍스트, 문장 = 공백 포함 텍스트 기준</p>
       </div>
     </div>
   )
