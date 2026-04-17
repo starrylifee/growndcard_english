@@ -16,7 +16,11 @@ export function Layout() {
     if (location.pathname.startsWith('/admin') && location.pathname !== '/admin/login') {
       logoutAdmin()
       navigate('/')
-    } else if (currentStudent && !location.pathname.startsWith('/admin')) {
+    } else if (location.pathname === '/practice' || location.pathname === '/practice/result') {
+      navigate('/dashboard')
+    } else if (location.pathname === '/quiz' || location.pathname === '/quiz/result') {
+      navigate('/dashboard')
+    } else if (location.pathname === '/dashboard') {
       clearCurrentStudent()
       navigate('/')
     } else {

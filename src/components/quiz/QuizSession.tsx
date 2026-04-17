@@ -289,12 +289,20 @@ export function QuizSession() {
             </div>
           </div>
         </div>
-        <button
-          onClick={startQuiz}
-          className="px-12 py-4 bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-2xl text-lg font-bold shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all active:scale-95"
-        >
-          퀴즈 시작!
-        </button>
+        <div className="flex gap-3 w-full max-w-sm">
+          <button
+            onClick={() => navigate('/dashboard')}
+            className="flex-1 py-4 bg-white border-2 border-gray-200 text-gray-600 rounded-2xl text-lg font-bold hover:bg-gray-50 transition-all active:scale-95"
+          >
+            돌아가기
+          </button>
+          <button
+            onClick={startQuiz}
+            className="flex-2 px-8 py-4 bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-2xl text-lg font-bold shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all active:scale-95"
+          >
+            퀴즈 시작!
+          </button>
+        </div>
       </div>
     )
   }

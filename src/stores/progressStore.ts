@@ -102,7 +102,7 @@ export const useProgressStore = create<ProgressState>()(
             ...get().progressMap,
             [studentCode]: {
               ...current,
-              currentRound: Math.min(current.currentRound + 1, 20),
+              currentRound: current.currentRound + 1,
             },
           },
         })
