@@ -8,6 +8,9 @@ import { elementary6Words } from './elementary6'
 import { middle1Words } from './middle1'
 import { middle2Words } from './middle2'
 import { middle3Words } from './middle3'
+import { bricksVocab300Words } from './bricksVocab300'
+
+export { bricksVocab300Units, getBricksUnitWords } from './bricksVocab300'
 
 export const allGrades: GradeWords[] = [
   { grade: 'elementary1', gradeLabel: '초1', words: elementary1Words },
@@ -19,6 +22,7 @@ export const allGrades: GradeWords[] = [
   { grade: 'middle1', gradeLabel: '중1', words: middle1Words },
   { grade: 'middle2', gradeLabel: '중2', words: middle2Words },
   { grade: 'middle3', gradeLabel: '중3', words: middle3Words },
+  { grade: 'bricksVocab300', gradeLabel: '브릭스 300 (초1)', words: bricksVocab300Words },
 ]
 
 export function getGradeWords(
