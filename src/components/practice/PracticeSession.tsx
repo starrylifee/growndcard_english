@@ -179,6 +179,15 @@ export function PracticeSession() {
     }
   }, [step, currentIndex, currentWord, mode, playWord])
 
+  useEffect(() => {
+    if (step !== 'session' || !showResult) return
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Enter') nextWord()
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [step, showResult, nextWord])
+
   if (!student || !progress) return null
 
   if (step === 'select') {

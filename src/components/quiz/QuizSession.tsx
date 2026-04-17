@@ -5,7 +5,7 @@ import { useConfigStore } from '../../stores/configStore'
 import { useProgressStore } from '../../stores/progressStore'
 import { usePointQueueStore } from '../../stores/pointQueueStore'
 import { useStudentConfig } from '../../hooks/useStudentConfig'
-import { getGradeWords } from '../../data/words'
+import { getGradeWords, bricksVocab300Units, getBricksUnitWords, bricksVocab300Words } from '../../data/words'
 import { getWordsForRound, pickRandomWords, generateMultipleChoices } from '../../utils/wordSets'
 import { checkAnswer, calculateQuizPoints } from '../../utils/scoring'
 import { speak } from '../../services/tts'
@@ -37,6 +37,7 @@ export function QuizSession() {
   const { effectiveGrade, effectiveQuizFormat, customSets } = useStudentConfig()
 
   const [step, setStep] = useState<QuizStep>('intro')
+  const [selectedBricksUnit, setSelectedBricksUnit] = useState<number | 'all'>('all')
   const [quizWords, setQuizWords] = useState<Word[]>([])
   const [allRoundWords, setAllRoundWords] = useState<Word[]>([])
   const [currentIndex, setCurrentIndex] = useState(0)
@@ -48,6 +49,7 @@ export function QuizSession() {
   const [ocrLoading, setOcrLoading] = useState(false)
   const [ocrError, setOcrError] = useState('')
 
+  const isBricksGrade = effectiveGrade === 'bricksVocab300'
   const format: QuizFormat = effectiveQuizFormat
   const totalQ = config.pointConfig.quiz.totalQuestions
 
@@ -57,17 +59,27 @@ export function QuizSession() {
 
   const startQuiz = useCallback(() => {
     if (!progress) return
-    const gradeWords = getGradeWords(effectiveGrade, customSets)
-    if (!gradeWords) return
 
-    const roundWords = getWordsForRound(gradeWords.words, progress.currentRound)
-    setAllRoundWords(roundWords)
-    const selected = pickRandomWords(roundWords, totalQ)
-    setQuizWords(selected)
+    let pool: Word[]
+    let distractor: Word[]
+
+    if (isBricksGrade && selectedBricksUnit !== 'all') {
+      pool = getBricksUnitWords(selectedBricksUnit)
+      distractor = bricksVocab300Words
+    } else {
+      const gradeWords = getGradeWords(effectiveGrade, customSets)
+      if (!gradeWords) return
+      const roundWords = getWordsForRound(gradeWords.words, progress.currentRound)
+      distractor = roundWords
+      pool = pickRandomWords(roundWords, totalQ)
+    }
+
+    setAllRoundWords(distractor)
+    setQuizWords(pool)
     setCurrentIndex(0)
     setAnswers([])
     setStep('session')
-  }, [progress, effectiveGrade, totalQ, customSets])
+  }, [progress, effectiveGrade, totalQ, customSets, isBricksGrade, selectedBricksUnit])
 
   const currentWord = quizWords[currentIndex]
 
@@ -189,6 +201,15 @@ export function QuizSession() {
     setStep('result')
   }
 
+  useEffect(() => {
+    if (step !== 'session' || !showResult) return
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Enter') nextWord()
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [step, showResult, nextWord])
+
   const ttsConfig = config.ttsConfig ?? { wordRate: 0.8, sentenceRate: 0.85 }
   const playWord = useCallback(() => {
     if (!currentWord) return
@@ -199,19 +220,58 @@ export function QuizSession() {
   if (!student || !progress) return null
 
   if (step === 'intro') {
+    const unitWordCount =
+      isBricksGrade && selectedBricksUnit !== 'all'
+        ? getBricksUnitWords(selectedBricksUnit).length
+        : null
+    const quizCount = unitWordCount ?? totalQ
+
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-6">
         <div className="text-6xl">🏆</div>
-        <h2 className="text-2xl font-bold text-gray-800">{progress.currentRound}회차 퀴즈</h2>
+        <h2 className="text-2xl font-bold text-gray-800">
+          {isBricksGrade
+            ? selectedBricksUnit === 'all'
+              ? '브릭스 300 퀴즈'
+              : `브릭스 300 Unit ${String(selectedBricksUnit).padStart(2, '0')}`
+            : `${progress.currentRound}회차 퀴즈`}
+        </h2>
+
+        {isBricksGrade && (
+          <div className="w-full max-w-sm">
+            <label className="block text-sm font-medium text-gray-600 mb-2 text-center">유닛 선택</label>
+            <select
+              value={selectedBricksUnit}
+              onChange={(e) =>
+                setSelectedBricksUnit(e.target.value === 'all' ? 'all' : parseInt(e.target.value))
+              }
+              className="w-full px-4 py-3 border-2 border-indigo-200 rounded-xl focus:border-indigo-400 focus:outline-none text-sm bg-indigo-50"
+            >
+              <option value="all">전체 유닛 (랜덤 {totalQ}개)</option>
+              {bricksVocab300Units.map((u) => (
+                <option key={u.unit} value={u.unit}>
+                  {u.label} — {getBricksUnitWords(u.unit).slice(0, 3).map((w) => w.english).join(', ')} ...
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
         <div className="bg-white rounded-2xl shadow-sm p-6 w-full max-w-sm">
-          <div className="flex flex-col gap-3 text-center">
+          <div className="flex flex-col gap-3">
             <div className="flex justify-between">
               <span className="text-gray-500">범위</span>
-              <span className="font-semibold">세트 1~{progress.currentRound} ({progress.currentRound * 10}단어)</span>
+              <span className="font-semibold">
+                {isBricksGrade && selectedBricksUnit !== 'all'
+                  ? `Unit ${String(selectedBricksUnit).padStart(2, '0')} (8단어)`
+                  : isBricksGrade
+                  ? `전체 ${bricksVocab300Words.length}단어`
+                  : `세트 1~${progress.currentRound} (${progress.currentRound * 10}단어)`}
+              </span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-500">문제 수</span>
-              <span className="font-semibold">{totalQ}문제</span>
+              <span className="font-semibold">{quizCount}문제</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-500">통과 기준</span>
